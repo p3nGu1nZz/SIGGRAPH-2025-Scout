@@ -1,0 +1,5 @@
+{
+  "name": "SIGGRAPH 2025 Scout",
+  "description": "An AI-powered research assistant that discovers, analyzes, and compiles SIGGRAPH 2025 technical papers and talks into downloadable summaries.",
+  "requestFramePermissions": []
+}
