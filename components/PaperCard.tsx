@@ -59,7 +59,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, onDeepDive, isAnaly
                <Quote size={12} className="text-slate-500" />
                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Citation</p>
             </div>
-            <div className="text-xs text-slate-300 font-mono bg-slate-900/60 p-3 rounded-lg border border-slate-700/80 shadow-inner break-words leading-relaxed select-all">
+            <div className="text-xs text-slate-300 font-mono bg-slate-950 p-3 rounded-lg border border-slate-600/50 shadow-inner break-words leading-relaxed select-all">
                {paper.citation}
             </div>
           </div>

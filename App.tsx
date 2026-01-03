@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, FileText, Download, Github, Layers, Sparkles, PlusCircle, Loader2, History, X, Check, AlertCircle, Menu, Upload, Save } from 'lucide-react';
+import { Search, FileText, Download, Github, Layers, Sparkles, PlusCircle, Loader2, History, X, Check, AlertCircle, Menu, Upload, Save, ChevronRight, Home as HomeIcon } from 'lucide-react';
 import { discoverPapers, generatePaperReport, verifyPaperCitation } from './services/geminiService';
 import { generateResearchPDF } from './utils/pdfGenerator';
 import { Paper, AppView } from './types';
@@ -340,6 +340,34 @@ export default function App() {
     }
   };
 
+  const renderBreadcrumbs = () => {
+    return (
+      <div className="hidden md:flex items-center text-sm font-medium text-slate-400 ml-4 pl-4 border-l border-slate-700 h-8 animate-fade-in">
+         <button 
+           onClick={() => {
+             if (view === AppView.DETAIL) handleBack();
+           }}
+           className={`flex items-center gap-1.5 transition-colors ${view === AppView.DETAIL ? 'hover:text-blue-400' : 'text-white cursor-default'}`}
+         >
+           <HomeIcon size={14} />
+           <span>Dashboard</span>
+         </button>
+         
+         {view === AppView.DETAIL && selectedPaper && (
+           <>
+             <ChevronRight size={14} className="mx-2 text-slate-600" />
+             <div className="flex items-center gap-1.5 text-blue-400">
+               <FileText size={14} />
+               <span className="truncate max-w-[200px] lg:max-w-[300px]" title={selectedPaper.title}>
+                 {selectedPaper.title}
+               </span>
+             </div>
+           </>
+         )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative overflow-x-hidden">
       
@@ -367,10 +395,10 @@ export default function App() {
       />
 
       {/* Navbar */}
-      <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/60">
+      <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-700/60 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
              {/* Hamburger / Menu Toggle */}
              <button 
                onClick={() => setIsSidebarOpen(true)}
@@ -382,12 +410,17 @@ export default function App() {
                )}
              </button>
 
-             <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleBack()}>
-               <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2 rounded-lg">
+             <div className="flex items-center gap-2 cursor-pointer group" onClick={() => handleBack()}>
+               <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2 rounded-lg group-hover:shadow-lg group-hover:shadow-blue-500/20 transition-all">
                  <Layers size={20} className="text-white" />
                </div>
-               <span className="font-bold text-xl tracking-tight hidden sm:block">SIGGRAPH<span className="text-blue-400">Scout</span></span>
+               <span className={`font-bold text-xl tracking-tight hidden ${view === AppView.DETAIL ? 'xl:block' : 'sm:block'}`}>
+                 SIGGRAPH<span className="text-blue-400">Scout</span>
+               </span>
              </div>
+
+             {/* Breadcrumbs */}
+             {renderBreadcrumbs()}
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">

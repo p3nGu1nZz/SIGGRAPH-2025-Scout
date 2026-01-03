@@ -1,19 +1,101 @@
 import { jsPDF } from "jspdf";
 import { Paper } from "../types";
 
-// Helper to clean markdown for PDF text
-const cleanMarkdown = (text: string): string => {
-  if (!text) return "";
-  return text
-    .replace(/#{1,6}\s?/g, '') // Remove Headers
-    .replace(/\*\*/g, '')      // Remove Bold
-    .replace(/\*/g, '')        // Remove Italic/Bullets
-    .replace(/`/g, '')         // Remove Code ticks
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links to text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .join('\n\n');
+// Helper to render Markdown content including code blocks
+const printMarkdownContent = (doc: jsPDF, text: string, margin: number, startY: number, maxLineWidth: number, pageHeight: number): number => {
+  let cursorY = startY;
+  const lines = text.split('\n');
+  let inCodeBlock = false;
+
+  doc.setFontSize(11);
+  doc.setTextColor(20, 20, 20);
+
+  lines.forEach((line) => {
+    // Check page break (estimate)
+    if (cursorY > pageHeight - 20) {
+      doc.addPage();
+      cursorY = margin;
+    }
+
+    const trimmed = line.trim();
+    
+    // Code block toggle
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      cursorY += 2;
+      return;
+    }
+
+    if (inCodeBlock) {
+      doc.setFont("courier", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 40);
+      
+      // Preserve spaces for indentation
+      // Replace tabs with 2 spaces
+      const codeLine = line.replace(/\t/g, '  ');
+      const splitCode = doc.splitTextToSize(codeLine, maxLineWidth);
+      
+      splitCode.forEach((l: string) => {
+        if (cursorY > pageHeight - 20) {
+             doc.addPage();
+             cursorY = margin;
+        }
+        // Background for code
+        doc.setFillColor(245, 247, 250);
+        doc.rect(margin, cursorY - 3, maxLineWidth, 4.5, 'F');
+        doc.text(l, margin + 2, cursorY);
+        cursorY += 4.5;
+      });
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(20, 20, 20);
+      
+      if (!trimmed) {
+        cursorY += 4;
+        return;
+      }
+      
+      let displayLine = trimmed;
+      let isHeader = false;
+      
+      if (trimmed.startsWith('##')) {
+         doc.setFont("helvetica", "bold");
+         doc.setFontSize(13);
+         doc.setTextColor(0, 51, 102);
+         displayLine = trimmed.replace(/^#{1,6}\s*/, '');
+         cursorY += 4;
+         isHeader = true;
+      } else if (trimmed.startsWith('**') || /^\d+\.\s/.test(trimmed)) {
+         doc.setFont("helvetica", "bold");
+      }
+
+      // Strip markdown syntax for PDF links and bold
+      displayLine = displayLine
+        .replace(/\*\*/g, '')
+        .replace(/`/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Convert [text](url) to text
+      
+      const splitText = doc.splitTextToSize(displayLine, maxLineWidth);
+      splitText.forEach((l: string) => {
+         if (cursorY > pageHeight - 20) {
+             doc.addPage();
+             cursorY = margin;
+         }
+         doc.text(l, margin, cursorY);
+         cursorY += isHeader ? 7 : 6;
+      });
+      
+      // Reset font if changed
+      if (isHeader) {
+          doc.setFontSize(11); 
+          doc.setTextColor(20, 20, 20);
+      }
+    }
+  });
+
+  return cursorY;
 };
 
 export const generatePaperAnalysisPDF = async (paper: Paper) => {
@@ -56,11 +138,13 @@ export const generatePaperAnalysisPDF = async (paper: Paper) => {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       
-      // Calculate Box Height based on citation text length
+      // Calculate Box Height based on citation text length plus extra space for link
       const citeText = paper.citation || "Citation not generated yet.";
       const citeLines = doc.splitTextToSize(citeText, 160);
-      // Base padding (14) + line height approx 4 * lines
-      const boxHeight = 16 + (citeLines.length * 4);
+      
+      const hasSourceLink = !!paper.verification?.sourceUrl;
+      // Base padding (16) + line height approx 4 * lines + extra space for link if exists
+      const boxHeight = 16 + (citeLines.length * 4) + (hasSourceLink ? 10 : 0);
 
       checkPageBreak(boxHeight + 5);
       
@@ -88,6 +172,14 @@ export const generatePaperAnalysisPDF = async (paper: Paper) => {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(40);
       doc.text(citeLines, margin + 5, cursorY + 14);
+
+      // Verified Source Link
+      if (paper.verification?.sourceUrl) {
+        const linkY = cursorY + 14 + (citeLines.length * 4) + 2;
+        doc.setTextColor(0, 80, 200);
+        doc.setFont("helvetica", "bold");
+        doc.textWithLink("→ Access Verified Source File", margin + 5, linkY, { url: paper.verification.sourceUrl });
+      }
 
       cursorY += boxHeight + 10;
   }
@@ -129,18 +221,9 @@ export const generatePaperAnalysisPDF = async (paper: Paper) => {
     doc.text("Deep Dive Analysis", margin, cursorY);
     cursorY += lineHeight + 5;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.setTextColor(20, 20, 20);
-
-    const cleanAnalysis = cleanMarkdown(paper.fullAnalysis);
-    const analysisLines = doc.splitTextToSize(cleanAnalysis, maxLineWidth);
-
-    analysisLines.forEach((line: string) => {
-      checkPageBreak(lineHeight);
-      doc.text(line, margin, cursorY);
-      cursorY += lineHeight;
-    });
+    // Use Helper for Content Parsing with Code Support
+    cursorY = printMarkdownContent(doc, paper.fullAnalysis, margin, cursorY, maxLineWidth, pageHeight);
+    
     cursorY += 10;
   }
 
@@ -149,11 +232,7 @@ export const generatePaperAnalysisPDF = async (paper: Paper) => {
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 255);
   doc.textWithLink("Original Source Link", margin, cursorY, { url: paper.url });
-  if (paper.verification?.sourceUrl) {
-     cursorY += 7;
-     doc.textWithLink("Verified Source Link", margin, cursorY, { url: paper.verification.sourceUrl });
-  }
-
+  
   doc.save(`${paper.title.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}_Analysis.pdf`);
 };
 
@@ -221,7 +300,7 @@ export const generateResearchPDF = async (
   // tocPageNumber will capture the actual page index of the TOC
   
   // Track where each paper starts for TOC links
-  const tocEntries: { title: string; page: number; verification: boolean }[] = [];
+  const tocEntries: { title: string; page: number; verification: boolean; doi?: string }[] = [];
 
   // --- Process Papers ---
   for (let i = 0; i < papers.length; i++) {
@@ -237,8 +316,6 @@ export const generateResearchPDF = async (
     // Start new page for paper
     doc.addPage();
     // CRITICAL: Capture the actual page number immediately after adding the page.
-    // doc.internal.getNumberOfPages() returns the total page count, which corresponds
-    // to the index of the newly added page (1-based index).
     const startPage = doc.internal.getNumberOfPages();
     cursorY = margin;
 
@@ -246,7 +323,8 @@ export const generateResearchPDF = async (
     tocEntries.push({ 
       title: paper.title, 
       page: startPage,
-      verification: !!paper.verification?.isVerified
+      verification: !!paper.verification?.isVerified,
+      doi: paper.doi
     });
 
     // Header ID
@@ -274,11 +352,11 @@ export const generateResearchPDF = async (
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         
-        // Calculate Box Height based on citation text length
+        // Calculate Box Height
         const citeText = paper.citation || "Citation not generated yet.";
         const citeLines = doc.splitTextToSize(citeText, 160);
-        // Base padding (14) + line height approx 4 * lines
-        const boxHeight = 16 + (citeLines.length * 4);
+        const hasSourceLink = !!paper.verification?.sourceUrl;
+        const boxHeight = 16 + (citeLines.length * 4) + (hasSourceLink ? 10 : 0);
 
         checkPageBreak(boxHeight + 5);
         
@@ -306,6 +384,14 @@ export const generateResearchPDF = async (
         doc.setFont("helvetica", "normal");
         doc.setTextColor(40);
         doc.text(citeLines, margin + 5, cursorY + 14);
+
+        // Verified Source Link
+        if (paper.verification?.sourceUrl) {
+          const linkY = cursorY + 14 + (citeLines.length * 4) + 2;
+          doc.setTextColor(0, 80, 200);
+          doc.setFont("helvetica", "bold");
+          doc.textWithLink("→ Access Verified Source File", margin + 5, linkY, { url: paper.verification.sourceUrl });
+        }
 
         cursorY += boxHeight + 10;
     }
@@ -347,18 +433,9 @@ export const generateResearchPDF = async (
       doc.text("Deep Dive Analysis", margin, cursorY);
       cursorY += lineHeight + 5;
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      doc.setTextColor(20, 20, 20);
-
-      const cleanAnalysis = cleanMarkdown(paper.fullAnalysis);
-      const analysisLines = doc.splitTextToSize(cleanAnalysis, maxLineWidth);
-
-      analysisLines.forEach((line: string) => {
-        checkPageBreak(lineHeight);
-        doc.text(line, margin, cursorY);
-        cursorY += lineHeight;
-      });
+      // Use Helper for Content Parsing with Code Support
+      cursorY = printMarkdownContent(doc, paper.fullAnalysis, margin, cursorY, maxLineWidth, pageHeight);
+      
       cursorY += 10;
     }
 
@@ -367,10 +444,6 @@ export const generateResearchPDF = async (
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 255);
     doc.textWithLink("Original Source Link", margin, cursorY, { url: paper.url });
-    if (paper.verification?.sourceUrl) {
-       cursorY += 7;
-       doc.textWithLink("Verified Source Link", margin, cursorY, { url: paper.verification.sourceUrl });
-    }
   }
 
   // --- Go Back and Fill TOC ---
@@ -387,12 +460,13 @@ export const generateResearchPDF = async (
   doc.setFont("helvetica", "normal");
 
   tocEntries.forEach((entry, i) => {
-    if (cursorY + 10 >= pageHeight) {
+    // Check space. Each entry might take 2 lines if DOI exists.
+    if (cursorY + 15 >= pageHeight) {
       doc.addPage();
       cursorY = margin;
     }
     
-    // Add Link
+    // Add Link for Title
     doc.setTextColor(0, 51, 102);
     const title = `${i + 1}. ${entry.title.substring(0, 70)}${entry.title.length > 70 ? '...' : ''}`;
     
@@ -403,13 +477,25 @@ export const generateResearchPDF = async (
     doc.text(lineText, margin, cursorY);
     
     // Create clickable link over text area
-    // pageNumber option in doc.link expects the 1-based page index.
-    // entry.page contains the exact page number captured during the loop.
     doc.link(margin, cursorY - 5, 170, 7, { pageNumber: entry.page });
     
     // Page number on right
     doc.setTextColor(100);
     doc.text(`p. ${entry.page}`, 180, cursorY, { align: 'right' });
+
+    // Render DOI alongside/below
+    if (entry.doi) {
+        cursorY += 5;
+        doc.setTextColor(0, 80, 200); // Blue for link
+        doc.setFontSize(9);
+        const doiUrl = entry.doi.startsWith('http') ? entry.doi : `https://doi.org/${entry.doi}`;
+        doc.textWithLink(`[DOI: ${entry.doi}]`, margin + 10, cursorY, { url: doiUrl });
+        
+        // Reset styles for next entry
+        doc.setTextColor(0, 51, 102); 
+        doc.setFontSize(11);
+        cursorY += 3; // Extra spacing after DOI line
+    }
 
     cursorY += 8;
   });

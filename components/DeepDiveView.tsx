@@ -150,7 +150,7 @@ export const DeepDiveView: React.FC<DeepDiveViewProps> = ({ paper, onBack }) => 
                     
                     {/* Citation Box */}
                     {paper.citation && (
-                      <div className="mt-4 bg-slate-950/50 p-4 rounded-lg border border-slate-700/60 shadow-inner">
+                      <div className="mt-4 bg-slate-950 p-4 rounded-lg border border-slate-600/60 shadow-md">
                          <div className="flex items-center gap-2 mb-2">
                              <Quote size={12} className="text-slate-500" />
                              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Recommended Citation</span>

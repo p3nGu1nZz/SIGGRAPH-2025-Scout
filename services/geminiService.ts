@@ -123,7 +123,8 @@ export const generatePaperReport = async (paper: Paper): Promise<string> => {
     2. Key Contributions (bullet points).
     3. Technical Methodology (speculate based on standard practices if full text unavailable).
     4. Potential Applications in Industry.
-    5. A formal Citation in ACM reference format.
+    5. Sample C++ Code: Provide a conceptual or actual C++ code snippet (using modern C++17/20 standards) that demonstrates the core algorithm, a key shader, or a data structure described in the paper. If exact implementation details are missing, provide high-quality pseudo-code or a C++ class structure. Add comments explaining the logic. Use \`\`\`cpp for code blocks.
+    6. A formal Citation in ACM reference format.
     
     Output strictly in Markdown format. Ensure the final section is ## Citation.
   `;
