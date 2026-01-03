@@ -22,11 +22,13 @@ export const discoverPapers = async (query: string, excludeTitles: string[] = []
 
   const searchPrompt = `
     Find research papers, technical talks, and sessions related to "${query}" for the SIGGRAPH 2025 conference.
-    Focus on finding real titles, authors, and brief descriptions from the available web information.
+    Using the Google Search tool, find REAL papers with valid URLs.
     
-    If specific SIGGRAPH 2025 papers are not yet fully public, find the most recent related graphics research from 2024-2025 that is likely to be relevant or pre-prints.
+    If specific SIGGRAPH 2025 papers are not yet fully public, find the most recent related graphics research from 2024-2025 that is likely to be relevant or pre-prints (arXiv).
     
     ${excludeInstruction}
+
+    CRITICAL: For the URL field, you MUST provide a valid direct link (PDF, arXiv, ACM DL, or Project Page) found in the search results. If you cannot find a direct link, leave it as "SEARCH". Do NOT invent URLs or return broken paths.
 
     FORMATTING INSTRUCTIONS:
     Return the data as a list of items separated by "|||ITEM|||".
@@ -55,13 +57,28 @@ export const discoverPapers = async (query: string, excludeTitles: string[] = []
       const parts = item.split("|||FIELD|||").map(p => p.trim());
       const clean = (s: string) => s ? s.replace(/\n/g, " ").trim() : "Unknown";
 
-      // Simple dedup check based on title similarity if needed, but rely on prompt mostly
+      const title = clean(parts[0] || "Untitled Research");
+      const rawUrl = clean(parts[3] || "#");
+
+      // Robust URL handling: Fallback to Google Search if URL is invalid, empty, or a placeholder
+      let url = rawUrl;
+      const isInvalidUrl = url === "#" || 
+                           url === "SEARCH" || 
+                           url.toLowerCase() === "unknown" || 
+                           !url.startsWith("http") ||
+                           url.includes("example.com");
+
+      if (isInvalidUrl) {
+         // Create a high-quality search query for the paper
+         url = `https://www.google.com/search?q=${encodeURIComponent(title + " SIGGRAPH research paper pdf")}`;
+      }
+
       return {
         id: `paper-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-        title: clean(parts[0] || "Untitled Research"),
+        title: title,
         authors: clean(parts[1] || "Unknown Authors"),
         summary: clean(parts[2] || "No summary available."),
-        url: clean(parts[3] || "#"),
+        url: url,
         tags: parts[4] ? parts[4].split(',').map(t => t.trim()) : ["Graphics", "Research"],
         createdAt: Date.now(),
       };

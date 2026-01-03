@@ -176,22 +176,43 @@ export const generateResearchPDF = async (
   };
 
   // --- Title Page ---
-  doc.setFontSize(24);
-  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(26);
+  doc.setTextColor(20, 20, 40);
+  doc.setFont("helvetica", "bold");
   doc.text("SIGGRAPH 2025", margin, cursorY);
-  cursorY += 10;
-  doc.setFontSize(18);
-  doc.setTextColor(60, 60, 60);
+  cursorY += 12;
+  
+  doc.setFontSize(20);
+  doc.setTextColor(60, 60, 70);
+  doc.setFont("helvetica", "normal");
   doc.text("Research Journal & Digest", margin, cursorY);
+  cursorY += 30;
+
+  // Accreditation & Metadata
+  doc.setFontSize(12);
+  doc.setTextColor(80, 80, 80);
+  
+  doc.text("Edited and Compiled by:", margin, cursorY);
+  cursorY += 6;
+  doc.setFont("helvetica", "bold");
+  doc.text("Kara Rawson", margin, cursorY);
+  doc.setFont("helvetica", "normal");
+  doc.text("rawsonkara@gmail.com", margin + 40, cursorY);
+  cursorY += 15;
+  
+  doc.text("Published by:", margin, cursorY);
+  cursorY += 6;
+  doc.setFont("helvetica", "bold");
+  doc.text("Cat Game Research 2026", margin, cursorY);
   cursorY += 20;
   
-  doc.setFontSize(12);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin, cursorY);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, cursorY);
   doc.text(`Total Papers: ${papers.length}`, margin, cursorY + 7);
   cursorY += 20;
 
   doc.setLineWidth(0.5);
+  doc.setDrawColor(200);
   doc.line(margin, cursorY, 190, cursorY);
   
   // Prepare TOC Page (Reserve space, will fill later)

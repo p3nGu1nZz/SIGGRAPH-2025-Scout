@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, FileText, Download, Github, Layers, Sparkles, PlusCircle, Loader2, History, X, Check, AlertCircle, Menu } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, FileText, Download, Github, Layers, Sparkles, PlusCircle, Loader2, History, X, Check, AlertCircle, Menu, Upload, Save } from 'lucide-react';
 import { discoverPapers, generatePaperReport, verifyPaperCitation } from './services/geminiService';
 import { generateResearchPDF } from './utils/pdfGenerator';
 import { Paper, AppView } from './types';
@@ -48,6 +48,9 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<ExportStatus>('idle');
   const [pdfProgress, setPdfProgress] = useState<{current: number, total: number} | undefined>(undefined);
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // -- Effects --
 
@@ -184,6 +187,10 @@ export default function App() {
         fullAnalysis: analysis,
         citation: verificationResult.citation || paper.citation, 
         doi: verificationResult.doi || paper.doi,
+        // Upgrade the main URL if we found a better verified one and the current one is a fallback
+        url: (verificationResult.sourceUrl && (paper.url.includes('google.com/search') || paper.url === '#'))
+             ? verificationResult.sourceUrl
+             : paper.url,
         verification: {
           isVerified: verificationResult.isVerified,
           sourceUrl: verificationResult.sourceUrl,
@@ -255,6 +262,61 @@ export default function App() {
     }
   };
 
+  // -- Session Management Handlers --
+
+  const handleSaveSession = () => {
+    const sessionData = {
+      papers,
+      timestamp: Date.now(),
+      version: '1.0'
+    };
+    const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `siggraph-scout-session-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadSessionClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const result = event.target?.result as string;
+        const data = JSON.parse(result);
+        
+        // Basic validation
+        if (Array.isArray(data.papers)) {
+          setPapers(data.papers);
+          setView(AppView.DASHBOARD);
+          setSelectedPaper(null);
+          // Optional: Success toast could go here
+        } else {
+          alert("Invalid session file format.");
+        }
+      } catch (err) {
+        console.error("Failed to parse session file", err);
+        alert("Failed to load session file.");
+      }
+      
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const renderPdfButtonContent = () => {
     switch (exportStatus) {
       case 'success':
@@ -281,6 +343,15 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative overflow-x-hidden">
       
+      {/* Hidden File Input for Loading Sessions */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept=".json" 
+        className="hidden" 
+      />
+
       <ResearchSidebar 
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -319,7 +390,26 @@ export default function App() {
              </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+             {/* Session Management Controls */}
+             <div className="flex items-center gap-1 mr-2">
+                <button 
+                  onClick={handleLoadSessionClick}
+                  className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded-lg transition-all"
+                  title="Load Session File"
+                >
+                  <Upload size={20} />
+                </button>
+                <button 
+                  onClick={handleSaveSession}
+                  className="p-2 text-slate-400 hover:text-green-400 hover:bg-slate-800 rounded-lg transition-all"
+                  title="Save Session File"
+                  disabled={papers.length === 0}
+                >
+                  <Save size={20} />
+                </button>
+             </div>
+
              {view === AppView.DASHBOARD && papers.length > 0 && (
                 <Button 
                   variant={exportStatus === 'success' ? 'primary' : 'secondary'} 
@@ -336,10 +426,10 @@ export default function App() {
                 </Button>
              )}
             <a 
-              href="https://github.com" 
+              href="https://github.com/p3nGu1nZz/SIGGRAPH-2025-Scout" 
               target="_blank" 
               rel="noreferrer" 
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-slate-400 hover:text-white transition-colors ml-2"
             >
               <Github size={20} />
             </a>
